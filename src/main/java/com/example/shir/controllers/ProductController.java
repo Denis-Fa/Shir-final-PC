@@ -14,6 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.security.Principal;
+import java.util.List;
 
 @Controller
 @RequiredArgsConstructor
@@ -22,8 +23,10 @@ public class ProductController {
 
     @GetMapping("/")
     public String products(@RequestParam(name = "searchWord", required = false) String title, Principal principal, Model model) {
-        model.addAttribute("products", productService.listProducts(title));
-        model.addAttribute("user", productService.getUserByPrincipal(principal));
+        User user = productService.getUserByPrincipal(principal);
+        List<Product> products = productService.getProducts(title, user);
+        model.addAttribute("products", products);
+        model.addAttribute("user", user);
         model.addAttribute("searchWord", title);
         return "products";
     }

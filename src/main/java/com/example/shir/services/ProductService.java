@@ -2,6 +2,7 @@ package com.example.shir.services;
 
 import com.example.shir.models.Image;
 import com.example.shir.models.Product;
+import com.example.shir.models.ProductDTO;
 import com.example.shir.models.User;
 import com.example.shir.repositories.ProductRepository;
 import com.example.shir.repositories.UserRepository;
@@ -13,6 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.security.Principal;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -20,6 +22,7 @@ import java.util.List;
 public class ProductService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
+    private final ToolRecommendationService toolRecommendationService;
 
     public List<Product> listProducts(String title) {
         if (title != null) return productRepository.findByTitle(title);
@@ -81,5 +84,43 @@ public class ProductService {
 
     public Product getProductById(Long id) {
         return productRepository.findById(id).orElse(null);
+    }
+
+
+    /**
+     * Метод для получения инструментов из БД или ИИ. <br>
+     * Получаем из базы данных количество хранящихся инструментов.  <br>
+     * Если поиск по инструментам пустой (null, empty), возвращаем пустой массив.  <br>
+     * Если title null или пустой, возвращаем выборку от ИИ рекомендаций по объявлениям.  <br>
+     * Если title НЕ пустой - выбираем ищем объявления в БД.  <br>
+     * @param title поиск по названию объявлений.
+     * @param user пользователь ищущий объявления.
+     */
+    public List<Product> getProducts(String title, User user) {
+        List<Product> products = List.of();
+        long countProduct = this.countProduct();
+        log.debug("getProducts count product: {}", countProduct);
+        if (countProduct <= 0 || user == null || user.getId() == null) {
+            return products;
+        }
+        if (title == null || title.isEmpty()) {
+            var productDTOList = toolRecommendationService.recommendedToolsForUser(user.getId(), countProduct);
+            products = this.getProductsByProductDTO(productDTOList);
+        } else {
+            products = this.listProducts(title);
+        }
+        return products;
+    }
+
+    public long countProduct() {
+        return productRepository.count();
+    }
+
+    private List<Product> getProductsByProductDTO(List<ProductDTO> productDTO) {
+        List<Long> listId = productDTO.stream()
+                .map(ProductDTO::getId)
+                .collect(Collectors.toList());
+        log.debug("getProductsByProductDTO product Id: {}", listId);
+        return productRepository.findAllById(listId);
     }
 }
